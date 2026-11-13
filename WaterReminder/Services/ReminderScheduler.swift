@@ -26,10 +26,10 @@ final class ReminderScheduler {
         (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
     }
 
-    /// 清空后按设置重排，返回实际排程条数。
-    func reschedule(settings: ReminderSettings) async -> Int {
-        center.removeAllPendingNotificationRequests()
-        guard settings.enabled else { return 0 }
+    /// 按设置生成排程点（含 64 条上限裁剪）。
+    /// 排程和“下次提醒”共用这一份结果，保证显示与实际一致。
+    func slots(for settings: ReminderSettings) -> [DateComponents] {
+        guard settings.enabled else { return [] }
 
         let start = min(max(settings.startHour, 0), 23)
         let end = min(max(settings.endHour, start), 23)
@@ -59,8 +59,17 @@ final class ReminderScheduler {
         if slots.count > maxPending {
             slots = Array(slots.prefix(maxPending))
         }
+        return slots
+    }
 
-        for (index, components) in slots.enumerated() {
+    /// 清空后按设置重排，返回实际排程条数。
+    func reschedule(settings: ReminderSettings) async -> Int {
+        center.removeAllPendingNotificationRequests()
+
+        let scheduledSlots = slots(for: settings)
+        guard !scheduledSlots.isEmpty else { return 0 }
+
+        for (index, components) in scheduledSlots.enumerated() {
             let content = UNMutableNotificationContent()
             content.title = "喝水时间到"
             content.body = messages[index % messages.count]
@@ -72,6 +81,40 @@ final class ReminderScheduler {
             try? await center.add(request)
         }
 
-        return slots.count
+        return scheduledSlots.count
+    }
+
+    /// 下一次会响的提醒时间；提醒关闭时返回 nil。
+    func nextReminderDate(settings: ReminderSettings, now: Date = Date()) -> Date? {
+        let allSlots = slots(for: settings)
+        guard !allSlots.isEmpty else { return nil }
+
+        let allowed = Set(allSlots.map { key(weekday: $0.weekday, hour: $0.hour) })
+        let calendar = Calendar.current
+        let startDay = calendar.startOfDay(for: now)
+
+        for offset in 0...8 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: startDay) else { continue }
+            let weekday = calendar.component(.weekday, from: day)
+
+            for hour in 0...23 {
+                let slotKey = key(weekday: settings.weekdaysOnly ? weekday : nil, hour: hour)
+                guard allowed.contains(slotKey) else { continue }
+                guard let candidate = calendar.date(
+                    bySettingHour: hour,
+                    minute: 0,
+                    second: 0,
+                    of: day
+                ) else { continue }
+                if candidate > now {
+                    return candidate
+                }
+            }
+        }
+        return nil
+    }
+
+    private func key(weekday: Int?, hour: Int?) -> String {
+        "\(weekday ?? 0)-\(hour ?? 0)"
     }
 }

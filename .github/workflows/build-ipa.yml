@@ -23,6 +23,9 @@ jobs:
       - name: Generate app icon
         run: swift tools/make_icon.swift WaterReminder/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 
+      - name: Generate sound effects
+        run: swift tools/make_sounds.swift
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

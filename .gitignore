@@ -6,5 +6,8 @@ DerivedData/
 # CI 生成的图标（tools/make_icon.swift 在本地或云端生成）
 WaterReminder/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 
+# CI 生成的音效（tools/make_sounds.swift 在本地或云端生成）
+WaterReminder/Resources/Sounds/*.wav
+
 # macOS
 .DS_Store

@@ -25,6 +25,9 @@ final class WaterStore: ObservableObject {
     @Published var cupVolume: Int = WaterStore.defaultCupVolume {
         didSet { save() }
     }
+    @Published var soundEnabled: Bool = true {
+        didSet { save() }
+    }
     @Published var reminder: ReminderSettings = ReminderSettings() {
         didSet { save() }
     }
@@ -39,8 +42,9 @@ final class WaterStore: ObservableObject {
         var logs: [String: Int]
         var goal: Int
         var reminder: ReminderSettings
-        /// 旧版本没有这个字段，必须可选，否则老数据解码失败会丢记录。
+        /// 旧版本没有这些字段，必须可选，否则老数据解码失败会丢记录。
         var cupVolume: Int?
+        var soundEnabled: Bool?
     }
 
     init() {
@@ -55,11 +59,30 @@ final class WaterStore: ObservableObject {
 
     func cups(on date: Date) -> Int { logs[Self.dayKey(date)] ?? 0 }
 
-    func addCup() { setCups(todayCups + 1) }
+    func addCup() {
+        setCups(todayCups + 1, on: Date())
+        playSound(.drink)
+    }
 
-    func removeCup() { setCups(max(0, todayCups - 1)) }
+    func removeCup() {
+        guard todayCups > 0 else { return }
+        setCups(todayCups - 1, on: Date())
+        playSound(.undo)
+    }
 
-    func resetToday() { setCups(0) }
+    func resetToday() {
+        setCups(0, on: Date())
+    }
+
+    /// 历史补记：不播音效。
+    func addCup(on date: Date) {
+        setCups(cups(on: date) + 1, on: date)
+    }
+
+    /// 历史减杯，最低 0。
+    func removeCup(on date: Date) {
+        setCups(max(0, cups(on: date) - 1), on: date)
+    }
 
     // MARK: - 历史
 
@@ -114,13 +137,24 @@ final class WaterStore: ObservableObject {
 
     // MARK: - 存储
 
-    private func setCups(_ value: Int) {
-        logs[Self.dayKey(Date())] = max(0, value)
+    private func setCups(_ value: Int, on date: Date) {
+        logs[Self.dayKey(date)] = max(0, value)
         save()
     }
 
+    private func playSound(_ sound: SoundPlayer.Sound) {
+        guard soundEnabled else { return }
+        SoundPlayer.shared.play(sound)
+    }
+
     private func save() {
-        let payload = Persisted(logs: logs, goal: goal, reminder: reminder, cupVolume: cupVolume)
+        let payload = Persisted(
+            logs: logs,
+            goal: goal,
+            reminder: reminder,
+            cupVolume: cupVolume,
+            soundEnabled: soundEnabled
+        )
         guard let data = try? JSONEncoder().encode(payload) else { return }
         UserDefaults.standard.set(data, forKey: storeKey)
     }
@@ -134,6 +168,7 @@ final class WaterStore: ObservableObject {
         goal = payload.goal
         reminder = payload.reminder
         cupVolume = payload.cupVolume ?? Self.defaultCupVolume
+        soundEnabled = payload.soundEnabled ?? true
     }
 
     static func dayKey(_ date: Date) -> String {

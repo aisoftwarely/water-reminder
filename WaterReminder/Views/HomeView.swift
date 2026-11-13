@@ -1,10 +1,16 @@
 import SwiftUI
+import Foundation
 
 struct HomeView: View {
     @EnvironmentObject private var store: WaterStore
 
     @State private var showHistory = false
     @State private var showSettings = false
+
+    @State private var celebrating = false
+    @State private var showBurst = false
+    @State private var burstExpanded = false
+    @State private var successFeedback = 0
 
     private var progress: Double {
         guard store.goal > 0 else { return 0 }
@@ -53,9 +59,17 @@ struct HomeView: View {
                 SettingsView().environmentObject(store)
             }
             .task {
+                SoundPlayer.shared.preload()
                 await store.refreshReminders()
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: store.todayCups)
+            .sensoryFeedback(.success, trigger: successFeedback)
+            .onChange(of: store.todayCups) { oldValue, newValue in
+                // 达标线跟随设置里的目标；只在向上跨过时庆祝一次
+                if oldValue < store.goal && newValue >= store.goal {
+                    celebrateGoal()
+                }
+            }
         }
     }
 
@@ -88,10 +102,16 @@ struct HomeView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+
+                if showBurst {
+                    burst
+                }
             }
             .frame(width: 200, height: 200)
+            .scaleEffect(celebrating ? 1.06 : 1)
+            .animation(.spring(response: 0.35, dampingFraction: 0.55), value: celebrating)
 
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Text(progress >= 1 ? "今日已达标" : "还差 \(remaining) 杯")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -101,6 +121,14 @@ struct HomeView: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
+
+                HStack(spacing: 5) {
+                    Image(systemName: reminderIcon)
+                    Text(reminderText)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
             }
         }
         .frame(maxWidth: .infinity)
@@ -109,6 +137,22 @@ struct HomeView: View {
             Color(.secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
+    }
+
+    private var burst: some View {
+        ZStack {
+            ForEach(0..<8, id: \.self) { index in
+                let angle = Double(index) / 8 * 2 * .pi
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.accentColor.opacity(burstExpanded ? 0 : 0.9))
+                    .offset(
+                        x: CGFloat(cos(angle)) * (burstExpanded ? 116 : 34),
+                        y: CGFloat(sin(angle)) * (burstExpanded ? 116 : 34)
+                    )
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     // MARK: - 操作
@@ -177,10 +221,76 @@ struct HomeView: View {
         return max(6, maxHeight * ratio)
     }
 
+    // MARK: - 达标庆祝
+
+    private func celebrateGoal() {
+        successFeedback += 1
+        SoundPlayer.shared.play(.achieve)
+
+        showBurst = true
+        burstExpanded = false
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) {
+            celebrating = true
+        }
+        withAnimation(.easeOut(duration: 0.8)) {
+            burstExpanded = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                celebrating = false
+            }
+            showBurst = false
+            burstExpanded = false
+        }
+    }
+
+    // MARK: - 下次提醒
+
+    private var reminderIcon: String {
+        if !store.reminder.enabled || store.notificationDenied {
+            return "bell.slash"
+        }
+        return "bell"
+    }
+
+    private var reminderText: String {
+        if !store.reminder.enabled {
+            return "提醒已关闭"
+        }
+        if store.notificationDenied {
+            return "通知未开启"
+        }
+        guard let date = ReminderScheduler.shared.nextReminderDate(settings: store.reminder) else {
+            return "暂无提醒"
+        }
+        return "下次提醒 · \(Self.relativeText(for: date))"
+    }
+
+    private static func relativeText(for date: Date) -> String {
+        let calendar = Calendar.current
+        let day: String
+        if calendar.isDateInToday(date) {
+            day = "今天"
+        } else if calendar.isDateInTomorrow(date) {
+            day = "明天"
+        } else {
+            day = weekdayFormatter.string(from: date)
+        }
+        return "\(day) \(timeFormatter.string(from: date))"
+    }
+
     private static let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "EEE"
+        return formatter
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "HH:mm"
         return formatter
     }()
 }

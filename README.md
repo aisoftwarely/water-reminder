@@ -2,6 +2,11 @@
 
 自用的 iPhone 喝水提醒 App：点一下记一杯（容量可在设置里改，默认 250 ml），工作日 9:00–21:00 每小时提醒，每天目标 8 杯，数据只存在手机本地。不上架 App Store。
 
+- 操作音效：喝水 / 撤销各有一声（合成音，无版权问题），尊重静音开关，可在设置里关闭
+- 达成每日目标时：环形脉冲 + 水滴扩散动画 + 庆祝音效（触发点跟随设置里的目标杯数）
+- 首页显示下次提醒时间
+- 历史页左右滑动可给过去某天补记或减一杯
+
 界面按 iOS 原生风格做，名字取自「弱水三千，只取一瓢饮」。
 
 ## 为什么在云端编译
@@ -56,9 +61,10 @@ curl -L -o WaterReminder.ipa \
 project.yml                     XcodeGen 工程配置
 WaterReminder/App/              入口
 WaterReminder/Models/           数据存储（UserDefaults + JSON）
-WaterReminder/Services/         本地通知排程
+WaterReminder/Services/         本地通知排程、音效播放
 WaterReminder/Views/            主界面 / 历史 / 设置
-WaterReminder/Resources/        图标与主题色
+WaterReminder/Resources/        图标、主题色、音效
 tools/make_icon.swift           生成 1024 App 图标
+tools/make_sounds.swift         合成 3 个操作音效（wav）
 .github/workflows/build-ipa.yml 云端构建
 ```

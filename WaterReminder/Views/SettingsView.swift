@@ -27,6 +27,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("操作音效", isOn: $store.soundEnabled)
+                } header: {
+                    Text("音效")
+                } footer: {
+                    Text("喝水、撤销的水声和达标庆祝音效。手机拨到静音时不会出声。")
+                }
+
+                Section {
                     Toggle("开启喝水提醒", isOn: $store.reminder.enabled)
 
                     if store.reminder.enabled {
@@ -64,7 +72,7 @@ struct SettingsView: View {
                 }
 
                 Section("关于") {
-                    LabeledContent("版本", value: "1.1")
+                    LabeledContent("版本", value: "1.2")
                     Text("一瓢 · 自用版，不上架 App Store。免费证书 7 天有效，需要 Mac 与手机同 Wi-Fi 自动续签；万一过期重装即可，喝水记录不会丢失。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)

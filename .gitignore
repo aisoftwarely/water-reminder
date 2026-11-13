@@ -1,0 +1,10 @@
+# 构建产物
+build/
+DerivedData/
+*.xcarchive
+
+# CI 生成的图标（tools/make_icon.swift 在本地或云端生成）
+WaterReminder/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
+# macOS
+.DS_Store

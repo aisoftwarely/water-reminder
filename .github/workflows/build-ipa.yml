@@ -1,0 +1,65 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: xcode-27
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Generate app icon
+        run: swift tools/make_icon.swift WaterReminder/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build unsigned app
+        run: |
+          xcodebuild \
+            -project WaterReminder.xcodeproj \
+            -scheme WaterReminder \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          rm -rf Payload WaterReminder.ipa
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/WaterReminder.app Payload/
+          zip -qry WaterReminder.ipa Payload
+          ls -lh WaterReminder.ipa
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WaterReminder-ipa
+          path: WaterReminder.ipa
+
+      - name: Publish release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          files: WaterReminder.ipa
+          generate_release_notes: false

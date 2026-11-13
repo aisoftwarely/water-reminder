@@ -10,9 +10,19 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Stepper(value: $store.cupVolume, in: 50...1000, step: 50) {
+                        Text("1 杯 = \(store.cupVolume) ml")
+                    }
+                } header: {
+                    Text("杯子容量")
+                } footer: {
+                    Text("按你常用杯子的实际容量设置。改完后总量会重新计算，已经记录的杯数不变。")
+                }
+
                 Section("每日目标") {
                     Stepper(value: $store.goal, in: 1...20) {
-                        Text("\(store.goal) 杯（\(store.goal * WaterStore.cupVolume) ml）")
+                        Text("\(store.goal) 杯（\(store.goal * store.cupVolume) ml）")
                     }
                 }
 
@@ -54,8 +64,8 @@ struct SettingsView: View {
                 }
 
                 Section("关于") {
-                    LabeledContent("版本", value: "1.0")
-                    Text("自用版，不上架 App Store。免费证书 7 天有效，需要 Mac 与手机同 Wi-Fi 自动续签；万一过期重装即可，喝水记录不会丢失。")
+                    LabeledContent("版本", value: "1.1")
+                    Text("一瓢 · 自用版，不上架 App Store。免费证书 7 天有效，需要 Mac 与手机同 Wi-Fi 自动续签；万一过期重装即可，喝水记录不会丢失。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

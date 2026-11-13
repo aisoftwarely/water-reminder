@@ -16,10 +16,13 @@ struct ReminderSettings: Codable, Equatable {
 }
 
 final class WaterStore: ObservableObject {
-    static let cupVolume = 250
+    static let defaultCupVolume = 250
 
     @Published private(set) var logs: [String: Int] = [:]
     @Published var goal: Int = 8 {
+        didSet { save() }
+    }
+    @Published var cupVolume: Int = WaterStore.defaultCupVolume {
         didSet { save() }
     }
     @Published var reminder: ReminderSettings = ReminderSettings() {
@@ -36,6 +39,8 @@ final class WaterStore: ObservableObject {
         var logs: [String: Int]
         var goal: Int
         var reminder: ReminderSettings
+        /// 旧版本没有这个字段，必须可选，否则老数据解码失败会丢记录。
+        var cupVolume: Int?
     }
 
     init() {
@@ -46,7 +51,7 @@ final class WaterStore: ObservableObject {
 
     var todayCups: Int { cups(on: Date()) }
 
-    var todayMilliliters: Int { todayCups * Self.cupVolume }
+    var todayMilliliters: Int { todayCups * cupVolume }
 
     func cups(on date: Date) -> Int { logs[Self.dayKey(date)] ?? 0 }
 
@@ -115,7 +120,7 @@ final class WaterStore: ObservableObject {
     }
 
     private func save() {
-        let payload = Persisted(logs: logs, goal: goal, reminder: reminder)
+        let payload = Persisted(logs: logs, goal: goal, reminder: reminder, cupVolume: cupVolume)
         guard let data = try? JSONEncoder().encode(payload) else { return }
         UserDefaults.standard.set(data, forKey: storeKey)
     }
@@ -128,6 +133,7 @@ final class WaterStore: ObservableObject {
         logs = payload.logs
         goal = payload.goal
         reminder = payload.reminder
+        cupVolume = payload.cupVolume ?? Self.defaultCupVolume
     }
 
     static func dayKey(_ date: Date) -> String {

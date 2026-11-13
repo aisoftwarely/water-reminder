@@ -1,12 +1,10 @@
 import SwiftUI
-import UIKit
 
 struct HomeView: View {
     @EnvironmentObject private var store: WaterStore
 
     @State private var showHistory = false
     @State private var showSettings = false
-    @State private var bump = false
 
     private var progress: Double {
         guard store.goal > 0 else { return 0 }
@@ -20,17 +18,16 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 20) {
                     ringCard
-                    drinkButton
+                    actionButtons
                     weekCard
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("多喝水")
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("一瓢")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -58,37 +55,33 @@ struct HomeView: View {
             .task {
                 await store.refreshReminders()
             }
+            .sensoryFeedback(.impact(weight: .medium), trigger: store.todayCups)
         }
     }
 
-    // MARK: - 进度环
+    // MARK: - 进度
 
     private var ringCard: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .stroke(Color.accentColor.opacity(0.12), lineWidth: 20)
+                    .stroke(Color(.systemFill), lineWidth: 18)
 
                 Circle()
                     .trim(from: 0, to: progress)
                     .stroke(
-                        AngularGradient(
-                            colors: [.cyan, .blue, .cyan],
-                            center: .center,
-                            startAngle: .degrees(-90),
-                            endAngle: .degrees(270)
-                        ),
-                        style: StrokeStyle(lineWidth: 20, lineCap: .round)
+                        Color.accentColor,
+                        style: StrokeStyle(lineWidth: 18, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.75), value: progress)
+                    .animation(.smooth(duration: 0.35), value: progress)
 
                 VStack(spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(store.todayCups)")
-                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .font(.system(size: 44, weight: .semibold, design: .rounded))
                         Text("/ \(store.goal)")
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                            .font(.title3)
                             .foregroundStyle(.secondary)
                     }
                     Text("\(store.todayMilliliters) ml")
@@ -96,90 +89,69 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .frame(width: 220, height: 220)
-            .scaleEffect(bump ? 1.04 : 1)
+            .frame(width: 200, height: 200)
 
-            HStack(spacing: 8) {
-                Image(systemName: progress >= 1 ? "checkmark.seal.fill" : "drop.fill")
-                Text(progress >= 1 ? "今日目标达成！" : "还差 \(remaining) 杯")
-            }
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(progress >= 1 ? Color.green : Color.secondary)
-
-            if store.streakDays > 0 {
-                Text("连续达成 \(store.streakDays) 天")
-                    .font(.caption)
+            VStack(spacing: 4) {
+                Text(progress >= 1 ? "今日已达标" : "还差 \(remaining) 杯")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                if store.streakDays > 0 {
+                    Text("连续达标 \(store.streakDays) 天")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(.vertical, 24)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
     }
 
-    // MARK: - 记录按钮
+    // MARK: - 操作
 
-    private var drinkButton: some View {
-        HStack(spacing: 12) {
+    private var actionButtons: some View {
+        VStack(spacing: 10) {
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    store.addCup()
-                    bump = true
-                }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation(.easeOut(duration: 0.2)) { bump = false }
-                }
+                store.addCup()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "drop.fill")
-                    Text("喝了一杯  +250 ml")
-                        .fontWeight(.semibold)
-                }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    LinearGradient(
-                        colors: [.blue, .cyan],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
-                .foregroundStyle(.white)
+                Label("喝了一杯 · \(store.cupVolume) ml", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
 
             Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    store.removeCup()
-                }
+                store.removeCup()
             } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(store.todayCups == 0 ? Color.secondary.opacity(0.4) : Color.secondary)
-                    .frame(width: 58, height: 58)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Label("撤销一杯", systemImage: "arrow.uturn.backward")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .controlSize(.large)
             .disabled(store.todayCups == 0)
-            .accessibilityLabel("撤销一杯")
         }
     }
 
     // MARK: - 最近 7 天
 
     private var weekCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("最近 7 天")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
 
-            HStack(alignment: .bottom, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 8) {
                 ForEach(store.lastDays(7)) { day in
                     VStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(day.cups >= store.goal ? Color.accentColor : Color.accentColor.opacity(0.25))
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(
+                                day.cups >= store.goal
+                                    ? Color.accentColor
+                                    : Color.accentColor.opacity(0.25)
+                            )
                             .frame(height: barHeight(for: day.cups))
 
                         Text(Self.weekdayFormatter.string(from: day.date))
@@ -189,14 +161,17 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .frame(height: 96, alignment: .bottom)
+            .frame(height: 84, alignment: .bottom)
         }
-        .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(16)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
     }
 
     private func barHeight(for cups: Int) -> CGFloat {
-        let maxHeight: CGFloat = 68
+        let maxHeight: CGFloat = 60
         guard store.goal > 0 else { return 6 }
         let ratio = min(1, Double(cups) / Double(store.goal))
         return max(6, maxHeight * ratio)

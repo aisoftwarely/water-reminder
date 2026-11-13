@@ -35,9 +35,12 @@ curl -L -o WaterReminder.ipa \
 ## 自动续签（免费证书 7 天有效）
 
 1. Finder 里选中 iPhone → 勾选「通过 Wi-Fi 同步」（只需在数据线连接时设置一次）。
-2. Sideloadly 中给这个 App 打开 **auto refresh**（Sideloadly Daemon 常驻后台）。
-3. 之后只要 Mac 每周内醒着、和手机连过同一个 Wi-Fi，就会自动续签。
-4. 万一过期：重新拖一次 IPA 安装即可，喝水记录不会丢（存在 App 本地）。
+2. Sideloadly 主窗口底部、**Start 按钮左边那个圆形箭头按钮**就是 AutoRefresh 开关，点成高亮；
+   悬停提示应为 `AutoRefresh [enabled]: ... before 7 days will pass`。
+3. 首次开启会询问 `Do you want to enable daemon auto-start?`，选 **Yes**。
+   之后 `sideloadly-daemon` 常驻，并在 `~/Library/LaunchAgents/io.sideloadly.daemon.plist` 注册开机自启。
+4. 之后只要 Mac 每周内醒着、和手机连过同一个 Wi-Fi，就会自动续签。
+5. 万一过期：重新拖一次 IPA 安装即可，喝水记录不会丢（存在 App 本地）。
 
 ## 已知限制
 

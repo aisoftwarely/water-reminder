@@ -14,9 +14,12 @@ struct HomeView: View {
     @State private var burstExpanded = false
     @State private var successFeedback = 0
 
+    /// 水波动画相位
+    @State private var wavePhase: Angle = .zero
+
     private var progress: Double {
         guard store.goal > 0 else { return 0 }
-        return min(1, Double(store.todayCups) / Double(store.goal))
+        return min(1.0, Double(store.todayCups) / Double(store.goal))
     }
 
     private var remaining: Int {
@@ -74,10 +77,13 @@ struct HomeView: View {
                 SoundPlayer.shared.preload()
                 await store.refreshReminders()
             }
+            .onAppear {
+                startWaveAnimation()
+            }
             .onChange(of: scenePhase) { _, phase in
-                // 回到前台时重排总结，数字才是最新的
                 if phase == .active {
                     store.refreshSummaries()
+                    startWaveAnimation()
                 }
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: store.todayCups)
@@ -91,70 +97,139 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - 进度
+    private func startWaveAnimation() {
+        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+            wavePhase = .degrees(360)
+        }
+    }
+
+    // MARK: - 灵动水漾进度卡片
 
     private var ringCard: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             ZStack {
+                // 1. 底层水球容器（带轻微内发光与水波）
                 Circle()
-                    .stroke(Color(.systemFill), lineWidth: 18)
+                    .fill(Color.accentColor.opacity(0.06))
+                    .frame(width: 200, height: 200)
 
+                // 2. 双层正弦水波纹
+                if progress > 0 {
+                    ZStack {
+                        // 后浪
+                        WaveShape(offset: wavePhase + .degrees(90), percent: progress)
+                            .fill(WaterTheme.waveBackGradient)
+
+                        // 前浪
+                        WaveShape(offset: -wavePhase, percent: progress)
+                            .fill(WaterTheme.waveFrontGradient)
+                    }
+                    .frame(width: 196, height: 196)
+                    .clipShape(Circle())
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7), value: progress)
+                }
+
+                // 3. 背景环槽
+                Circle()
+                    .stroke(Color(.systemFill).opacity(0.8), lineWidth: 16)
+                    .frame(width: 196, height: 196)
+
+                // 4. 水漾主进度环（角向渐变 + 柔和端点）
                 Circle()
                     .trim(from: 0, to: progress)
                     .stroke(
-                        Color.accentColor,
-                        style: StrokeStyle(lineWidth: 18, lineCap: .round)
+                        AngularGradient(
+                            colors: [Color.waterCyan, Color.waterOcean, Color.waterCyan],
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        ),
+                        style: StrokeStyle(lineWidth: 16, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
-                    .animation(.smooth(duration: 0.35), value: progress)
+                    .frame(width: 196, height: 196)
+                    .animation(.smooth(duration: 0.4), value: progress)
+                    .shadow(
+                        color: progress > 0 ? Color.waterOcean.opacity(0.25) : .clear,
+                        radius: 8,
+                        x: 0,
+                        y: 3
+                    )
 
+                // 5. 中央数据排版
                 VStack(spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
                         Text("\(store.todayCups)")
-                            .font(.system(size: 44, weight: .semibold, design: .rounded))
+                            .font(.system(size: 46, weight: .bold, design: .rounded))
+                            .contentTransition(.numericText())
                         Text("/ \(store.goal)")
-                            .font(.title3)
+                            .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
+
                     Text("\(store.todayMilliliters) ml")
-                        .font(.subheadline)
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color(.tertiarySystemFill).opacity(0.7))
+                        )
                 }
 
                 if showBurst {
                     burst
                 }
             }
-            .frame(width: 200, height: 200)
             .scaleEffect(celebrating ? 1.06 : 1)
             .animation(.spring(response: 0.35, dampingFraction: 0.55), value: celebrating)
 
-            VStack(spacing: 6) {
-                Text(progress >= 1 ? "今日已达标" : "还差 \(remaining) 杯")
-                    .font(.footnote)
+            // 状态指示区域
+            VStack(spacing: 8) {
+                // 达标 / 剩余提示
+                if progress >= 1.0 {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                        Text("今日已达标")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.green)
+                    }
+                } else {
+                    Text("还差 \(remaining) 杯即可达标")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
+                    if store.streakDays > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .foregroundStyle(.orange)
+                            Text("连续 \(store.streakDays) 天")
+                        }
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.12), in: Capsule())
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: reminderIcon)
+                        Text(reminderText)
+                    }
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-
-                if store.streakDays > 0 {
-                    Text("连续达标 \(store.streakDays) 天")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.tertiarySystemFill), in: Capsule())
                 }
-
-                HStack(spacing: 5) {
-                    Image(systemName: reminderIcon)
-                    Text(reminderText)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
+        .waterCard(cornerRadius: 18)
     }
 
     private var burst: some View {
@@ -162,81 +237,128 @@ struct HomeView: View {
             ForEach(0..<8, id: \.self) { index in
                 let angle = Double(index) / 8 * 2 * .pi
                 Image(systemName: "drop.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.accentColor.opacity(burstExpanded ? 0 : 0.9))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.waterCyan.opacity(burstExpanded ? 0 : 0.95))
                     .offset(
-                        x: CGFloat(cos(angle)) * (burstExpanded ? 116 : 34),
-                        y: CGFloat(sin(angle)) * (burstExpanded ? 116 : 34)
+                        x: CGFloat(cos(angle)) * (burstExpanded ? 120 : 34),
+                        y: CGFloat(sin(angle)) * (burstExpanded ? 120 : 34)
                     )
             }
         }
         .allowsHitTesting(false)
     }
 
-    // MARK: - 操作
+    // MARK: - 英雄打卡主操作与副按钮
 
     private var actionButtons: some View {
         VStack(spacing: 10) {
             Button {
                 store.addCup()
             } label: {
-                Label("喝了一杯 · \(store.cupVolume) ml", systemImage: "plus")
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                    Text("喝了一杯 · \(store.cupVolume) ml")
+                        .font(.headline.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(
+                    WaterTheme.primaryGradient,
+                    in: Capsule()
+                )
+                .shadow(
+                    color: Color.waterOcean.opacity(0.35),
+                    radius: 10,
+                    x: 0,
+                    y: 5
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(WaterHeroButtonStyle())
 
             Button {
                 store.removeCup()
             } label: {
                 Label("撤销一杯", systemImage: "arrow.uturn.backward")
+                    .font(.subheadline)
+                    .foregroundStyle(store.todayCups > 0 ? Color.secondary : Color.secondary.opacity(0.4))
                     .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(
+                        Capsule()
+                            .fill(Color(.tertiarySystemFill).opacity(0.6))
+                    )
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
+            .buttonStyle(.plain)
             .disabled(store.todayCups == 0)
         }
     }
 
-    // MARK: - 最近 7 天
+    // MARK: - 最近 7 天胶囊柱状微图表
 
     private var weekCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("最近 7 天")
-                .font(.subheadline.weight(.semibold))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("最近 7 天")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("目标 \(store.goal) 杯/天")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
 
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 10) {
                 ForEach(store.lastDays(7)) { day in
+                    let isToday = Calendar.current.isDateInToday(day.date)
+                    let met = day.cups >= store.goal
+
                     VStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        Capsule()
                             .fill(
-                                day.cups >= store.goal
-                                    ? Color.accentColor
-                                    : Color.accentColor.opacity(0.25)
+                                met
+                                    ? WaterTheme.barGradient
+                                    : WaterTheme.barInactiveGradient
                             )
                             .frame(height: barHeight(for: day.cups))
+                            .overlay(alignment: .top) {
+                                if met {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.8))
+                                        .frame(width: 4, height: 4)
+                                        .padding(.top, 3)
+                                }
+                            }
 
-                        Text(Self.weekdayFormatter.string(from: day.date))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        VStack(spacing: 2) {
+                            Text(Self.weekdayFormatter.string(from: day.date))
+                                .font(.caption2)
+                                .fontWeight(isToday ? .bold : .regular)
+                                .foregroundStyle(isToday ? Color.accentColor : Color.secondary)
+
+                            if isToday {
+                                Circle()
+                                    .fill(Color.accentColor)
+                                    .frame(width: 4, height: 4)
+                            } else {
+                                Color.clear.frame(width: 4, height: 4)
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
-            .frame(height: 84, alignment: .bottom)
+            .frame(height: 90, alignment: .bottom)
         }
         .padding(16)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
+        .waterCard(cornerRadius: 16)
     }
 
     private func barHeight(for cups: Int) -> CGFloat {
         let maxHeight: CGFloat = 60
         guard store.goal > 0 else { return 6 }
         let ratio = min(1, Double(cups) / Double(store.goal))
-        return max(6, maxHeight * ratio)
+        return max(8, maxHeight * ratio)
     }
 
     // MARK: - 达标庆祝

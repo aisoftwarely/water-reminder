@@ -164,33 +164,69 @@ struct StatsView: View {
         0...max(Double(store.goal) + 2, Double(maxCupsInPeriod) + 1)
     }
 
-    // MARK: - 摘要卡片（2 列网格）
+    // MARK: - 摘要卡片（2 列网格，带彩色微图标）
 
     private var summaryGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-            statTile(title: "日均饮水", value: String(format: "%.1f 杯", averageCups))
-            statTile(title: "总饮水量", value: volumeText(totalCups * store.cupVolume))
-            statTile(title: "达标天数", value: "\(metGoalCount)/\(pastPoints.count) 天")
-            statTile(title: "连续达标", value: "\(store.streakDays) 天")
+            statTile(
+                title: "日均饮水",
+                value: String(format: "%.1f 杯", averageCups),
+                icon: "drop.fill",
+                iconColor: Color.waterCyan,
+                iconBg: Color.waterCyan.opacity(0.12)
+            )
+            statTile(
+                title: "总饮水量",
+                value: volumeText(totalCups * store.cupVolume),
+                icon: "waterbottle.fill",
+                iconColor: Color.waterOcean,
+                iconBg: Color.waterOcean.opacity(0.12)
+            )
+            statTile(
+                title: "达标天数",
+                value: "\(metGoalCount)/\(pastPoints.count) 天",
+                icon: "checkmark.seal.fill",
+                iconColor: Color.green,
+                iconBg: Color.green.opacity(0.12)
+            )
+            statTile(
+                title: "连续达标",
+                value: "\(store.streakDays) 天",
+                icon: "flame.fill",
+                iconColor: Color.orange,
+                iconBg: Color.orange.opacity(0.12)
+            )
         }
     }
 
-    private func statTile(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func statTile(
+        title: String,
+        value: String,
+        icon: String,
+        iconColor: Color,
+        iconBg: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(iconColor)
+                    .frame(width: 24, height: 24)
+                    .background(iconBg, in: Circle())
+
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Text(value)
-                .font(.headline)
+                .font(.system(.title3, design: .rounded, weight: .bold))
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
+        .padding(14)
+        .waterCard(cornerRadius: 14)
     }
 
     // MARK: - 文字小结
@@ -198,8 +234,14 @@ struct StatsView: View {
     private var narrativeCard: some View {
         card {
             VStack(alignment: .leading, spacing: 6) {
-                Text("小结")
-                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.waterCyan)
+                        .font(.subheadline)
+                    Text("周期小结")
+                        .font(.subheadline.weight(.semibold))
+                }
+
                 Text(narrativeText)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -241,18 +283,24 @@ struct StatsView: View {
         return avg > 0 ? avg : nil
     }
 
-    // MARK: - 月历热力图（参考「睡个好觉」设计）
+    // MARK: - 月历热力图（8pt 圆角 + 今日呼吸边框）
 
     private var calendarCard: some View {
         card {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("每日饮水")
-                    .font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("每日饮水")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("深色 = 达到目标")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
 
-                LazyVGrid(columns: heatColumns, spacing: 4) {
+                LazyVGrid(columns: heatColumns, spacing: 5) {
                     ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { symbol in
                         Text(symbol)
-                            .font(.caption2)
+                            .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                     ForEach(0..<leadingBlankCount, id: \.self) { _ in
@@ -275,17 +323,14 @@ struct StatsView: View {
                     Text("多")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("深色 = 达到目标")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
                 }
+                .padding(.top, 4)
             }
         }
     }
 
     private var heatColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+        Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
     }
 
     /// 月份第一天之前空几格（以周一开头）
@@ -306,23 +351,32 @@ struct StatsView: View {
 
     private func heatColor(level: Int) -> Color {
         switch level {
-        case 0: return Color.accentColor.opacity(0.2)
-        case 1: return Color.accentColor.opacity(0.45)
-        case 2: return Color.accentColor.opacity(0.7)
-        default: return Color.accentColor
+        case 0: return Color.waterCyan.opacity(0.20)
+        case 1: return Color.waterCyan.opacity(0.48)
+        case 2: return Color.waterOcean.opacity(0.75)
+        default: return Color.waterOcean
         }
     }
 
     private func heatCell(_ point: DayWaterPoint) -> some View {
         let dayNumber = calendar.component(.day, from: point.day)
         let level = heatLevel(for: point)
+        let isToday = calendar.isDateInToday(point.day)
 
         return ZStack {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(level.map { heatColor(level: $0) } ?? Color(.systemFill))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(level.map { heatColor(level: $0) } ?? Color(.systemFill).opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(
+                            isToday ? Color.accentColor : Color.clear,
+                            lineWidth: 1.5
+                        )
+                )
+
             Text("\(dayNumber)")
-                .font(.caption2)
-                .foregroundStyle(level == 3 ? Color.white : Color.primary)
+                .font(.caption2.weight(isToday ? .bold : .regular))
+                .foregroundStyle(level == 3 ? Color.white : (isToday ? Color.accentColor : Color.primary))
         }
         .frame(height: 38)
         .accessibilityElement(children: .ignore)
@@ -334,33 +388,40 @@ struct StatsView: View {
 
     private var chartCard: some View {
         card {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("饮水趋势")
                         .font(.subheadline.weight(.semibold))
                     Spacer()
                     Text("目标 \(store.goal) 杯/天")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
                 Chart {
                     ForEach(points) { point in
+                        let met = point.cups >= store.goal
                         BarMark(
                             x: .value("日期", point.day, unit: .day),
                             y: .value("杯数", point.cups)
                         )
                         .foregroundStyle(
-                            point.cups >= store.goal
-                                ? Color.accentColor
-                                : Color.accentColor.opacity(0.35)
+                            met ? WaterTheme.barGradient : WaterTheme.barInactiveGradient
                         )
-                        .cornerRadius(3)
+                        .cornerRadius(4)
                     }
 
                     RuleMark(y: .value("目标", Double(store.goal)))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .foregroundStyle(.secondary)
+                        .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
+                        .foregroundStyle(Color.secondary.opacity(0.7))
+                        .annotation(position: .top, alignment: .trailing) {
+                            Text("目标 \(store.goal) 杯")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color(.systemBackground).opacity(0.8), in: RoundedRectangle(cornerRadius: 3))
+                        }
                 }
                 .chartYScale(domain: chartYDomain)
                 .chartXAxis { xAxis }
@@ -376,7 +437,7 @@ struct StatsView: View {
                     }
                 }
                 .chartLegend(.hidden)
-                .frame(height: 180)
+                .frame(height: 185)
             }
         }
     }
@@ -404,9 +465,9 @@ struct StatsView: View {
     private var emptyCard: some View {
         card {
             VStack(spacing: 12) {
-                Image(systemName: "chart.bar")
-                    .font(.system(size: 38))
-                    .foregroundStyle(Color.accentColor)
+                Image(systemName: "drop.degreesign")
+                    .font(.system(size: 40))
+                    .foregroundStyle(Color.waterCyan)
                 Text("还没有足够的数据")
                     .font(.headline)
                 Text("在这个时间段内还没有记录喝水。喝一杯后，这里会显示趋势与统计。")
@@ -415,7 +476,7 @@ struct StatsView: View {
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            .padding(.vertical, 28)
         }
     }
 
@@ -425,10 +486,7 @@ struct StatsView: View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
+            .waterCard(cornerRadius: 16)
     }
 
     private func volumeText(_ milliliters: Int) -> String {

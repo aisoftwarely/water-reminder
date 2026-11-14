@@ -60,7 +60,7 @@ struct SettingsView: View {
                 }
 
                 Section("关于") {
-                    LabeledContent("版本", value: "1.3")
+                    LabeledContent("版本", value: "1.4")
                     Text("再来一杯 · 自用版，不上架 App Store。免费证书 7 天有效，需要 Mac 与手机同一局域网自动续签；万一过期重装即可，喝水记录不会丢失。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)

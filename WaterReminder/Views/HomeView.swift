@@ -3,9 +3,11 @@ import Foundation
 
 struct HomeView: View {
     @EnvironmentObject private var store: WaterStore
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showHistory = false
     @State private var showSettings = false
+    @State private var showStats = false
 
     @State private var celebrating = false
     @State private var showBurst = false
@@ -33,15 +35,22 @@ struct HomeView: View {
                 .padding(.vertical, 12)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("一瓢")
+            .navigationTitle("再来一杯")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
                     Button {
                         showHistory = true
                     } label: {
                         Image(systemName: "calendar")
                     }
                     .accessibilityLabel("历史记录")
+
+                    Button {
+                        showStats = true
+                    } label: {
+                        Image(systemName: "chart.bar")
+                    }
+                    .accessibilityLabel("统计")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -58,9 +67,18 @@ struct HomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView().environmentObject(store)
             }
+            .sheet(isPresented: $showStats) {
+                StatsView().environmentObject(store)
+            }
             .task {
                 SoundPlayer.shared.preload()
                 await store.refreshReminders()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // 回到前台时重排总结，数字才是最新的
+                if phase == .active {
+                    store.refreshSummaries()
+                }
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: store.todayCups)
             .sensoryFeedback(.success, trigger: successFeedback)
@@ -261,7 +279,7 @@ struct HomeView: View {
         if store.notificationDenied {
             return "通知未开启"
         }
-        guard let date = ReminderScheduler.shared.nextReminderDate(settings: store.reminder) else {
+        guard let date = store.nextReminderDate else {
             return "暂无提醒"
         }
         return "下次提醒 · \(Self.relativeText(for: date))"
